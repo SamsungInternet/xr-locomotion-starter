@@ -6,7 +6,7 @@ import alias from '@rollup/plugin-alias';
 import del from 'rollup-plugin-delete'
 
 export default {
-	input: "src/garden.js",
+	input: "src/index.js",
 	preserveEntrySignatures: 'false',
 	output: {
 		dir: "build/",
@@ -15,6 +15,7 @@ export default {
 		manualChunks: {
 			// 'three': ['three'],
 			'three': ['three/src/Three.js'],
+			'garden': ['./src/garden.js'],
 			// 'three-stdlib': ['three-stdlib'],
 			// 'tween': ['@tweenjs/tween.js'],
 		},

@@ -67,7 +67,14 @@ const guideSprite = new Mesh(
 guideSprite.rotation.x = -Math.PI/2;
 
 let guidingController = null;
-function onSelectStart() {
+function onSelectStart(e) {
+    const xrInputSource = e.data;
+
+    // This is a hand and being handled by hand tracking so do nothing
+    if (xrInputSource.hand) {
+        return;
+    }
+
     guidingController = this;
     guideLight.intensity = 1;
     this.add(guideline);
@@ -104,36 +111,28 @@ function onSelectEnd() {
     }
 }
 
-const controller1 = renderer.xr.getController(0);
-controller1.addEventListener('selectstart', onSelectStart);
-controller1.addEventListener('selectend', onSelectEnd);
-cameraGroup.add(controller1);
-
-const controller2 = renderer.xr.getController(1);
-controller2.addEventListener('selectstart', onSelectStart);
-controller2.addEventListener('selectend', onSelectEnd);
-cameraGroup.add(controller2);
-
 const controllerModelFactory = new XRControllerModelFactory();
 const handModelFactory = new XRHandModelFactory();
 
-const controllerGrip1 = renderer.xr.getControllerGrip(0);
-const model1 = controllerModelFactory.createControllerModel( controllerGrip1 );
-controllerGrip1.add( model1 );
-cameraGroup.add( controllerGrip1 );
+const controllers = [0,1].map(function (index) {
+    const controller = renderer.xr.getController(index);
+    controller.addEventListener('selectstart', onSelectStart);
+    controller.addEventListener('selectend', onSelectEnd);
+    cameraGroup.add(controller);
 
-const controllerGrip2 = renderer.xr.getControllerGrip( 1 );
-const model2 = controllerModelFactory.createControllerModel( controllerGrip2 );
-controllerGrip2.add( model2 );
-cameraGroup.add( controllerGrip2 );
+    const controllerGrip = renderer.xr.getControllerGrip(index);
+    const model = controllerModelFactory.createControllerModel( controllerGrip );
+    controllerGrip.add( model );
+    cameraGroup.add( controllerGrip );
 
-const hand1 = renderer.xr.getHand( 0 );
-cameraGroup.add( hand1 );
-hand1.add( handModelFactory.createHandModel( hand1, "mesh" ) );
+    const hand = renderer.xr.getHand( index );
+    cameraGroup.add( hand );
+    hand.add( handModelFactory.createHandModel( hand, "mesh" ) );
 
-const hand2 = renderer.xr.getHand( 1 );
-cameraGroup.add( hand2 );
-hand2.add( handModelFactory.createHandModel( hand2, "mesh" ) );
+    return {
+        hand, grip: controllerGrip, controller
+    }
+});
 
 rafCallbacks.add(() => {
     if (guidingController) {
@@ -190,6 +189,11 @@ gamepad.addEventListener('axes1MoveMiddle', handleUp, true);
 gamepad.addEventListener('axes3MoveMiddle', handleUp, true);
 gamepad.addEventListener('axes1MoveEnd', handleUpEnd, true);
 gamepad.addEventListener('axes3MoveEnd', handleUpEnd, true);
+
+const controller1 = controllers[0].controller;
+const controller2 = controllers[1].controller;
+const controllerGrip1 = controllers[0].grip;
+const controllerGrip2 = controllers[1].grip;
 
 export {
     controller1,

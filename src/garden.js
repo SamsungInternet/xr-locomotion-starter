@@ -13,6 +13,10 @@ import {
 } from './lib/controllers/gamepad.js';
 
 import {
+    hand1, hand2
+} from "./lib/controllers/hands.js";
+
+import {
     Mesh,
     MeshBasicMaterial,
     PlaneGeometry,
@@ -72,6 +76,13 @@ writeText('hi');
 gamepad.addEventListener('gamepadInteraction', function (event) {
     writeText(`${event.detail.type} ${event.detail.value}`);
 });
+
+
+function log(e) {
+    writeText(e.type);
+}
+hand1.addEventListener('peace pose began', log);
+hand2.addEventListener('peace pose began', log);
 
 (async function () {
 
