@@ -1,8 +1,7 @@
 import {
-    scene, renderer, rafCallbacks, cameraGroup, camera
+    scene, renderer, camera, rafCallbacks, cameraGroup
 } from '../scene.js';
-import { XRControllerModelFactory } from 'three/examples/jsm/webxr/XRControllerModelFactory.js'; 
-import { XRHandModelFactory } from 'three/examples/jsm/webxr/XRHandModelFactory.js'; 
+
 import {
     Mesh,
     MeshBasicMaterial,
@@ -16,20 +15,20 @@ import {
     AdditiveBlending,
     Line
 } from  'three';
+
 import {
     gamepad
-} from './gamepad.js';
+} from '../controllers/gamepad.js';
 
 import {
     locomotion
-} from './locomotion/fade.js';
+} from './fade.js';
 
-function positionAtT(inVec,t,p,v,g) {
-    inVec.copy(p);
-    inVec.addScaledVector(v,t);
-    inVec.addScaledVector(g,0.5*t**2);
-    return inVec;
-}
+import {
+    controller1,
+    controller2,
+    hand1, hand2
+} from '../controllers/index.js'
 
 // Utility Vectors
 const g = new Vector3(0,-9.8,0);
@@ -37,6 +36,14 @@ const tempVec = new Vector3();
 const tempVec1 = new Vector3();
 const tempVecP = new Vector3();
 const tempVecV = new Vector3();
+
+// Guideline parabola function
+function positionAtT(inVec,t,p,v,g) {
+    inVec.copy(p);
+    inVec.addScaledVector(v,t);
+    inVec.addScaledVector(g,0.5*t**2);
+    return inVec;
+}
 
 // The guideline
 const lineSegments=10;
@@ -68,21 +75,38 @@ guideSprite.rotation.x = -Math.PI/2;
 
 let guidingController = null;
 function onSelectStart(e) {
-    const xrInputSource = e.data;
 
-    // This is a hand and being handled by hand tracking so do nothing
-    if (xrInputSource.hand) {
+    // This is e.data is an XRInputSource and if 
+    // it has a hand and being handled by hand tracking so do nothing
+    if (e && e.data && e.data.hand) {
         return;
     }
 
-    guidingController = this;
+	const controller = this;
+
+    console.log("startGuide", controller);
+
+    guidingController = controller;
     guideLight.intensity = 1;
-    this.add(guideline);
+    controller.add(guideline);
+    scene.add(guideSprite);
+}
+
+function onPointStart() {
+
+	const controller = this;
+
+    console.log("startGuide", controller);
+
+    guidingController = controller;
+    guideLight.intensity = 1;
+    controller.add(guideline);
     scene.add(guideSprite);
 }
 
 function onSelectEnd() {
     if (guidingController === this) {
+		console.log("onSelectEnd", this);
 
         // first work out vector from feet to cursor
 
@@ -111,28 +135,43 @@ function onSelectEnd() {
     }
 }
 
-const controllerModelFactory = new XRControllerModelFactory();
-const handModelFactory = new XRHandModelFactory();
-
-const controllers = [0,1].map(function (index) {
-    const controller = renderer.xr.getController(index);
-    controller.addEventListener('selectstart', onSelectStart);
-    controller.addEventListener('selectend', onSelectEnd);
-    cameraGroup.add(controller);
-
-    const controllerGrip = renderer.xr.getControllerGrip(index);
-    const model = controllerModelFactory.createControllerModel( controllerGrip );
-    controllerGrip.add( model );
-    cameraGroup.add( controllerGrip );
-
-    const hand = renderer.xr.getHand( index );
-    cameraGroup.add( hand );
-    hand.add( handModelFactory.createHandModel( hand, "mesh" ) );
-
-    return {
-        hand, grip: controllerGrip, controller
+function handleMove({detail}) {
+    // Turn left
+    if (detail.value > 0) {
+        cameraGroup.rotation.y -= Math.PI/4;
     }
-});
+    // Turn right
+    if (detail.value < 0) {
+        cameraGroup.rotation.y += Math.PI/4;
+    }
+}
+
+function handleUp({detail}) {
+    if (detail.value < 0) {
+        onSelectStart.bind(detail.controller)();
+    }
+}
+function handleUpEnd({detail}) {
+    onSelectEnd.bind(detail.controller)();
+}
+
+gamepad.addEventListener('axes0MoveMiddle', handleMove, true);
+gamepad.addEventListener('axes2MoveMiddle', handleMove, true);
+
+gamepad.addEventListener('axes1MoveMiddle', handleUp, true);
+gamepad.addEventListener('axes3MoveMiddle', handleUp, true);
+gamepad.addEventListener('axes1MoveEnd', handleUpEnd, true);
+gamepad.addEventListener('axes3MoveEnd', handleUpEnd, true);
+
+controller1.addEventListener('selectstart', onSelectStart);
+controller1.addEventListener('selectend', onSelectEnd);
+controller2.addEventListener('selectstart', onSelectStart);
+controller2.addEventListener('selectend', onSelectEnd);
+
+hand1.addEventListener('fire point pose began', e => onPointStart.bind(e.hand.joints['index-finger-tip'])());
+hand2.addEventListener('fire point pose began', e => onPointStart.bind(e.hand.joints['index-finger-tip'])());
+hand1.addEventListener('fire point pose ended', e => onSelectEnd.bind(e.hand.joints['index-finger-tip'])());
+hand2.addEventListener('fire point pose ended', e => onSelectEnd.bind(e.hand.joints['index-finger-tip'])());
 
 rafCallbacks.add(() => {
     if (guidingController) {
@@ -163,41 +202,3 @@ rafCallbacks.add(() => {
         positionAtT(guideSprite.position,t*0.98,p,v,g);
     }
 });
-
-function handleMove({detail}) {
-    // Turn left
-    if (detail.value > 0) {
-        cameraGroup.rotation.y -= Math.PI/4;
-    }
-    // Turn right
-    if (detail.value < 0) {
-        cameraGroup.rotation.y += Math.PI/4;
-    }
-}
-gamepad.addEventListener('axes0MoveMiddle', handleMove, true);
-gamepad.addEventListener('axes2MoveMiddle', handleMove, true);
-
-function handleUp({detail}) {
-    if (detail.value < 0) {
-        onSelectStart.bind(detail.controller)();
-    }
-}
-function handleUpEnd({detail}) {
-    onSelectEnd.bind(detail.controller)();
-}
-gamepad.addEventListener('axes1MoveMiddle', handleUp, true);
-gamepad.addEventListener('axes3MoveMiddle', handleUp, true);
-gamepad.addEventListener('axes1MoveEnd', handleUpEnd, true);
-gamepad.addEventListener('axes3MoveEnd', handleUpEnd, true);
-
-const controller1 = controllers[0].controller;
-const controller2 = controllers[1].controller;
-const controllerGrip1 = controllers[0].grip;
-const controllerGrip2 = controllers[1].grip;
-
-export {
-    controller1,
-    controller2,
-    controllerGrip1,
-    controllerGrip2
-};

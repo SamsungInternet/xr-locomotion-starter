@@ -17,16 +17,18 @@
   "devDependencies": {
     "@rollup/plugin-alias": "^3.1.2",
     "@rollup/plugin-node-resolve": "^13.0.0",
+    "rollup-plugin-comlink": "git+https://github.com/AdaRoseCannon/rollup-plugin-comlink#add-import-path",
+    "@surma/rollup-plugin-off-main-thread": "^2.2.2",
     "@tweenjs/tween.js": "^18.6.4",
-    "handy.js": "git+https://github.com/AdaRoseCannon/handy.js.git",
+    "comlink": "^4.3.1",
     "jshint": "^2.13.0",
-    "rollup": "^2.50.6",
+    "rollup": "^2.51.2",
     "rollup-plugin-analyzer": "^4.0.0",
     "rollup-plugin-commonjs": "^10.1.0",
     "rollup-plugin-delete": "^2.0.0",
     "rollup-plugin-terser": "^7.0.2",
     "three": "^0.129.0",
-    "three-stdlib": "^2.0.5",
+    "three-stdlib": "^2.2.0",
     "webxr-polyfill": "^2.0.3"
   }
 }
