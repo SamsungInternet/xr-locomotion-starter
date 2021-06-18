@@ -6,7 +6,7 @@ import {
 } from './lib/scene.js';
 
 import {
-    controller1
+    controller1, hand1
 } from './lib/controllers/index.js';
 
 import {
@@ -14,6 +14,10 @@ import {
 } from './lib/controllers/gamepad.js';
 
 import './lib/locomotion/index.js';
+
+import {
+    handPoses
+} from './lib/controllers/hand-poses/index.js';
 
 import {
     Mesh,
@@ -55,7 +59,7 @@ function writeText(text) {
     if (typeof text !== 'string') {
         text = JSON.stringify(text,null,2);
     }
-    const size = 60;
+    const size = 300;
     ctx.font = size + "px Sans";
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -75,6 +79,11 @@ writeText('hi');
 
 gamepad.addEventListener('gamepadInteraction', function (event) {
     writeText(`${event.detail.type} ${event.detail.value}`);
+});
+
+handPoses.addEventListener('pose', function ({detail}) {
+    // writeText(detail.join('\n'));
+    writeText(detail[0][0]);
 });
 
 (async function () {

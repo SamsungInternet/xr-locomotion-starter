@@ -1,6 +1,7 @@
+import { n as normalize, t as transfer, e as expose } from './shared-d00c46b0.js';
+import './three-b47b1406.js';
+
 // this runs as a web worker
-import {transfer} from 'comlink';
-import normalize from './normalize.js';
 
 console.log('Worker started');
 
@@ -29,7 +30,7 @@ class HandPose {
 				1 + // poseHandDataSize offset
 				(poseHandDataSize * 16) * isRight // offset for right hand
 			)*4 , poseHandDataSize * 16);
-			const poseWeightData = new Float32Array(poseData.buffer, (
+			new Float32Array(poseData.buffer, (
 				1 + // poseHandDataSize offset
 				(poseHandDataSize * 16) * 2 + // offset for after hand data
 				(poseHandDataSize * isRight)      // offset for right hand
@@ -59,4 +60,10 @@ class HandPose {
 	}
 }
 
-export default HandPose;
+var m = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	'default': HandPose
+});
+
+expose(m);
+//# sourceMappingURL=handpose-3f8d42f7.js.map

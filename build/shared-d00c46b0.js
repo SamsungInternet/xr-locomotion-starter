@@ -1,3 +1,5 @@
+import { a0 as Matrix4 } from './three-b47b1406.js';
+
 /**
  * Copyright 2019 Google Inc. All Rights Reserved.
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -290,5 +292,29 @@ function generateUUID() {
         .join("-");
 }
 
-export { expose as e, transfer as t, wrap as w };
-//# sourceMappingURL=comlink-594073c5.js.map
+/**
+ * Modify an Array of Matrixes in place by premultiplying them by the inverse of the first item.
+ * 
+ * @param { Float32Array } handPose Array of 4x4 Matrixes in column order
+ */
+function normalize(handPose) {
+
+    // handPose is the concatenated data of 4x4 Matrices
+    const size = handPose.length/16;
+
+    // The first item in hand pose information is the wrist
+    const inverseWristMat = new Matrix4();
+    inverseWristMat.fromArray(handPose, 0);
+    inverseWristMat.invert();
+
+    const tempMat = new Matrix4();
+    for (let i=0; i<size; i++) {
+        const offset = i*16;
+        tempMat.fromArray(handPose, offset);
+        tempMat.premultiply(inverseWristMat);
+        tempMat.toArray(handPose, offset);
+    }
+}
+
+export { expose as e, normalize as n, transfer as t, wrap as w };
+//# sourceMappingURL=shared-d00c46b0.js.map

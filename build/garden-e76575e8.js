@@ -1,5 +1,5 @@
 import { E as EventDispatcher, V as Vector3, M as MOUSE, T as TOUCH, Q as Quaternion, S as Spherical, a as Vector2, G as Group$1, W as WebGLRenderer, b as Scene, P as PerspectiveCamera, D as DirectionalLight, c as Mesh, d as SphereGeometry, e as MeshBasicMaterial, A as AmbientLight, B as BackSide, f as TextureLoader, R as RepeatWrapping, g as PlaneGeometry, h as MeshLambertMaterial, L as Loader, i as LoaderUtils, F as FileLoader, C as Color, j as SpotLight, k as PointLight, l as MeshPhysicalMaterial, m as TangentSpaceNormalMap, I as ImageBitmapLoader, n as InterleavedBuffer, o as BufferAttribute, p as RGBFormat, q as LinearFilter, r as LinearMipmapLinearFilter, s as PointsMaterial, t as Material, u as LineBasicMaterial, v as MeshStandardMaterial, w as DoubleSide, x as sRGBEncoding, y as PropertyBinding, z as BufferGeometry, H as SkinnedMesh, J as LineSegments, K as Line, N as LineLoop, O as Points, U as radToDeg, X as OrthographicCamera, Y as InterpolateLinear, Z as AnimationClip, _ as Bone, $ as Object3D, a0 as Matrix4, a1 as Skeleton, a2 as TriangleFanDrawMode, a3 as Interpolant, a4 as NearestFilter, a5 as NearestMipmapNearestFilter, a6 as LinearMipmapNearestFilter, a7 as NearestMipmapLinearFilter, a8 as ClampToEdgeWrapping, a9 as MirroredRepeatWrapping, aa as InterpolateDiscrete, ab as FrontSide, ac as InterleavedBufferAttribute, ad as CanvasTexture, ae as TriangleStripDrawMode, af as VectorKeyframeTrack, ag as QuaternionKeyframeTrack, ah as NumberKeyframeTrack, ai as Box3, aj as Sphere, ak as BoxGeometry, al as InstancedMesh, am as DynamicDrawUsage, an as AdditiveBlending } from './three-b47b1406.js';
-import { w as wrap, t as transfer } from './comlink-594073c5.js';
+import { w as wrap, n as normalize, t as transfer } from './shared-d00c46b0.js';
 
 // This set of controls performs orbiting, dollying (zooming), and panning.
 // Unlike TrackballControls, it maintains the "up" direction object.up (+Y by default).
@@ -7202,17 +7202,22 @@ const controllers = [0,1].map(function (index) {
 
 const controller1 = controllers[0].controller;
 const controller2 = controllers[1].controller;
-const hand1 = controllers[0].hand;
-const hand2 = controllers[1].hand;
+controllers[0].hand;
+controllers[1].hand;
 controllers[0].grip;
 controllers[1].grip;
 
-var workerPath = "handpose-a3860818.js";
+var workerPath = "handpose-3f8d42f7.js";
 
-const currentImportPath = (new URL(import.meta.url).pathname.match(/(^\/.+)*\//g) || [""])[0];
-		var HandPose = wrap(new Worker(currentImportPath + workerPath, {type: "module"}));
+var comlinkHandPose = wrap(new Worker(new URL(workerPath, import.meta.url), {type: "module"}));
 
-var peace = {};
+const HandPose = comlinkHandPose.default;
+await HandPose.loadPose('relax', '/poses/relax.handpose');
+await HandPose.loadPose('fist', '/poses/fist.handpose');
+await HandPose.loadPose('flat', '/poses/flat.handpose');
+await HandPose.loadPose('point', '/poses/point.handpose');
+
+const handPoses = new EventTarget();
 
 class HandInfo {
 	#ready
@@ -7221,51 +7226,124 @@ class HandInfo {
 		source, handPose
 	}) {
 		this.handPose = handPose;
-		this.handPose.registerPose(peace);
 		this.size = source.hand.size;
 		this.jointKeys = Array.from(source.hand.keys());
-		this.jointValues = source.hand.values();
+		this.hand = source.hand;
 		this.jointMatrixArray = new Float32Array(source.hand.size * 16);
 		this.handedness = source.handedness;
 
 		this.#ready = true;
 	}
 
-	async update(xrViewerPose) {
+	async update(xrViewerPose, referenceSpace, frame) {
 		if (!this.#ready) {
 			console.warn('Pose detection taking too long');
-			return;
+			return [];
 		}
 
 		// transfer the pose array buffer to the thread, we now cannot do anything until it returns so mark it as not ready
 		this.#ready = false;
-		this.jointMatrixArray = await this.handPose.update(xrViewerPose, transfer(this.jointMatrixArray, [this.jointMatrixArray.buffer]), this.handedness);
+		frame.fillPoses( this.hand.values() , referenceSpace, this.jointMatrixArray );
+		const returnData = await this.handPose.update(
+			xrViewerPose.transform.matrix,
+			transfer(this.jointMatrixArray, [this.jointMatrixArray.buffer]),
+			this.handedness
+		);
+		this.jointMatrixArray = returnData.usedHandArrayBuffer;
 		this.#ready = true;
+		return returnData.distances;
 	}
 }
 const hands = new Map();
 
-async function update(referenceSpace, frame) {
+function dumpHands() {
+	window.__dumpHands = true;
+}
+
+window.dumpHands = dumpHands;
+
+function update(referenceSpace, frame) {
 	const session = renderer.xr.getSession();
 	let i = 0;
-	if (session) {
+	if (session && frame) {
 		const xrViewerPose = frame.getViewerPose(referenceSpace);
+
+		if (window.__dumpHands) {
+			const hands = {};
+			for (const source of session.inputSources) {
+				if (!source.hand) continue;
+				hands[source.handedness] = source.hand;
+			}
+			if (hands.left && hands.right) {
+				window.__dumpHands = false;
+
+				const size = hands.left.size;
+				const outData = new Float32Array(
+					1 +         // store size
+					size * 16 + // left hand
+					size * 16 + // right hand
+					size +      // weighting for individual joints left hand
+					size        // weighting for individual joints right hand
+				);
+
+				outData[0] = size;
+				const leftHandAccessor = new Float32Array(outData.buffer, 4, size * 16);
+				const rightHandAccessor = new Float32Array(outData.buffer, 4 + (size * 16 * 4), size * 16);
+				const weights = new Float32Array(outData.buffer, 4 + 2 * (size * 16 * 4), size * 2);
+				weights.fill(1);
+
+				frame.fillPoses( hands.left.values() , referenceSpace, leftHandAccessor );
+				frame.fillPoses( hands.right.values() , referenceSpace, rightHandAccessor );
+
+				normalize(leftHandAccessor);
+				normalize(rightHandAccessor);
+
+				console.log(outData);
+
+				const a = window.document.createElement('a');
+
+				a.href = window.URL.createObjectURL(
+					new Blob(
+						[new Uint8Array(outData.buffer)],
+						{ type: 'application/octet-stream' }
+					)
+				);
+				a.download = 'untitled.handpose';
+				
+				// Append anchor to body.
+				document.body.appendChild(a);
+				a.click();
+				
+				// Remove anchor from body
+				document.body.removeChild(a);
+			}
+		}
+
 		for (const source of session.inputSources) {
 			if (!source.hand) continue;
 
-			const hand = renderer.xr.getHand(i++);
+			renderer.xr.getHand(i++);
 			if (!hands.has(i)) {
-				const handPose = await new HandPose();
-				hands.set(i, new HandInfo(source, handPose));
-			}
+				const handPosePromise = new HandPose();
+				hands.set(i, handPosePromise);
+				handPosePromise.then(handPose => {
+					const handInfo = new HandInfo({source, handPose});
+					hands.set(i, handInfo);
+				});
+			} else {
 
-			const handInfo = hands.get(i);
-			frame.fillPoses( handInfo.jointValues , referenceSpace, handInfo.jointMatrixArrayBuffer );
-			handInfo.update(xrViewerPose);
-			
-			hand.dispatchEvent( { type: 'hand-pose', message: {
-				poses: []
-			}});
+				const handInfo = hands.get(i);
+				if (handInfo instanceof Promise) continue;
+
+				handInfo.update(xrViewerPose, referenceSpace, frame)
+				.then(function (distances) {
+					const handPoseEvent = new CustomEvent('pose', {detail: distances});
+					handPoses.dispatchEvent(handPoseEvent);
+				})
+				.catch(function (err) {
+					console.log(err);
+				});
+			}
 		}
 	}
 }
@@ -7285,7 +7363,6 @@ function dispatchEvent(type, detail) {
 }
 
 rafCallbacks.add((timestamp, frame) => {
-
     
     const session = renderer.xr.getSession();
     update(renderer.xr.getReferenceSpace(), frame);
@@ -7424,18 +7501,6 @@ function onSelectStart(e) {
     scene.add(guideSprite);
 }
 
-function onPointStart() {
-
-	const controller = this;
-
-    console.log("startGuide", controller);
-
-    guidingController = controller;
-    guideLight.intensity = 1;
-    controller.add(guideline);
-    scene.add(guideSprite);
-}
-
 function onSelectEnd() {
     if (guidingController === this) {
 		console.log("onSelectEnd", this);
@@ -7500,11 +7565,6 @@ controller1.addEventListener('selectend', onSelectEnd);
 controller2.addEventListener('selectstart', onSelectStart);
 controller2.addEventListener('selectend', onSelectEnd);
 
-hand1.addEventListener('fire point pose began', e => onPointStart.bind(e.hand.joints['index-finger-tip'])());
-hand2.addEventListener('fire point pose began', e => onPointStart.bind(e.hand.joints['index-finger-tip'])());
-hand1.addEventListener('fire point pose ended', e => onSelectEnd.bind(e.hand.joints['index-finger-tip'])());
-hand2.addEventListener('fire point pose ended', e => onSelectEnd.bind(e.hand.joints['index-finger-tip'])());
-
 rafCallbacks.add(() => {
     if (guidingController) {
         // Controller start position
@@ -7564,7 +7624,7 @@ function writeText(text) {
     if (typeof text !== 'string') {
         text = JSON.stringify(text,null,2);
     }
-    const size = 60;
+    const size = 300;
     ctx.font = size + "px Sans";
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -7586,6 +7646,11 @@ gamepad.addEventListener('gamepadInteraction', function (event) {
     writeText(`${event.detail.type} ${event.detail.value}`);
 });
 
+handPoses.addEventListener('pose', function ({detail}) {
+    // writeText(detail.join('\n'));
+    writeText(detail[0][0]);
+});
+
 (async function () {
 
     // Forest from Google Poly, https://poly.google.com/view/2_fv3tn3NG_
@@ -7605,4 +7670,4 @@ gamepad.addEventListener('gamepadInteraction', function (event) {
 
 window.renderer = renderer;
 window.camera = camera;
-//# sourceMappingURL=garden-2a64f4ef.js.map
+//# sourceMappingURL=garden-e76575e8.js.map

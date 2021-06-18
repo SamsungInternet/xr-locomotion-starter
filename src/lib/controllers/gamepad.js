@@ -21,7 +21,6 @@ function dispatchEvent(type, detail) {
 }
 
 rafCallbacks.add((timestamp, frame) => {
-
     
     const session = renderer.xr.getSession();
     update(renderer.xr.getReferenceSpace(), frame);

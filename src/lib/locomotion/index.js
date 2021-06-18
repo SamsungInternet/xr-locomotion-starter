@@ -26,8 +26,7 @@ import {
 
 import {
     controller1,
-    controller2,
-    hand1, hand2
+    controller2
 } from '../controllers/index.js'
 
 // Utility Vectors
@@ -167,11 +166,6 @@ controller1.addEventListener('selectstart', onSelectStart);
 controller1.addEventListener('selectend', onSelectEnd);
 controller2.addEventListener('selectstart', onSelectStart);
 controller2.addEventListener('selectend', onSelectEnd);
-
-hand1.addEventListener('fire point pose began', e => onPointStart.bind(e.hand.joints['index-finger-tip'])());
-hand2.addEventListener('fire point pose began', e => onPointStart.bind(e.hand.joints['index-finger-tip'])());
-hand1.addEventListener('fire point pose ended', e => onSelectEnd.bind(e.hand.joints['index-finger-tip'])());
-hand2.addEventListener('fire point pose ended', e => onSelectEnd.bind(e.hand.joints['index-finger-tip'])());
 
 rafCallbacks.add(() => {
     if (guidingController) {

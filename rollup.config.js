@@ -4,7 +4,7 @@ import { terser } from "rollup-plugin-terser";
 import analyze from 'rollup-plugin-analyzer';
 import alias from '@rollup/plugin-alias';
 import del from 'rollup-plugin-delete'
-import comlink from "rollup-plugin-comlink";
+import comlink from "@surma/rollup-plugin-comlink";
 import omt from "@surma/rollup-plugin-off-main-thread";
 
 export default {
@@ -18,7 +18,8 @@ export default {
 			// 'three': ['three'],
 			'three': ['three/src/Three.js'],
 			'garden': ['./src/garden.js'],
-			'comlink': ['comlink'],
+			'shared': ['comlink', './src/lib/controllers/hand-poses/normalize.js'],
+			// 'comlink': ['comlink'],
 			// 'three-stdlib': ['three-stdlib'],
 			// 'tween': ['@tweenjs/tween.js'],
 		},
